@@ -17,21 +17,20 @@ class AnalyzeRequest(BaseModel):
 def preprocess_audio(path: str):
     y, sr = librosa.load(path, sr=22050)
 
-    mel = librosa.feature.melspectrogram(y=y, sr=sr, n_mels=128)
-    mel_db = librosa.power_to_db(mel, ref=np.max)
+    # Compute MFCCs (40 coefficients)
+    mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=40)
 
-    target_frames = 128
-    if mel_db.shape[1] < target_frames:
-        mel_db = np.pad(mel_db, ((0, 0), (0, target_frames - mel_db.shape[1])), mode="constant")
-    else:
-        mel_db = mel_db[:, :target_frames]
+    # Aggregate over time to get fixed-length vector
+    mfcc_mean = np.mean(mfcc, axis=1)  # shape (40,)
 
-    x = mel_db.astype(np.float32)
+    x = mfcc_mean.astype(np.float32)
+
+    # Optional normalization
     x = (x - x.mean()) / (x.std() + 1e-6)
 
-    x = np.expand_dims(x, axis=0)   # batch
-    x = np.expand_dims(x, axis=-1)  # channel
+    x = np.expand_dims(x, axis=0)  # shape (1, 40)
     return x
+
 
 @app.get("/")
 def root():
